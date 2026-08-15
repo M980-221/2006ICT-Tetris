@@ -6,7 +6,13 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.*;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.Slider;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.TextAlignment;
@@ -19,8 +25,9 @@ public final class TetrisApplication extends Application {
 
     private Stage stage;
 
-    private record HighScore(String playerName, int score) {
-    }
+    private final GameSettings settings = new GameSettings();
+
+    private GamePane activeGamePane;
 
     @Override
     public void start(Stage stage) {
@@ -30,10 +37,12 @@ public final class TetrisApplication extends Application {
         stage.setResizable(false);
 
         showSplashScreen();
+
         stage.show();
     }
 
     private void showSplashScreen() {
+
         Label title = new Label("PG2 TETRIS");
         title.setFont(Font.font(38));
 
@@ -50,237 +59,688 @@ public final class TetrisApplication extends Application {
 
         group.setTextAlignment(TextAlignment.CENTER);
 
-        VBox root = new VBox(20, title, course, group);
+        VBox root = new VBox(
+                20,
+                title,
+                course,
+                group
+        );
+
         root.setAlignment(Pos.CENTER);
         root.setPadding(new Insets(30));
-        root.setStyle("-fx-background-color: #e8f4ff;");
 
-        stage.setScene(new Scene(root, 600, 700));
+        root.setStyle(
+                "-fx-background-color: #e8f4ff;"
+        );
+
+        stage.setScene(
+                new Scene(
+                        root,
+                        600,
+                        700
+                )
+        );
+
+        stage.setWidth(600);
+        stage.setHeight(700);
+
         stage.centerOnScreen();
 
         PauseTransition timer =
-                new PauseTransition(Duration.seconds(3));
+                new PauseTransition(
+                        Duration.seconds(3)
+                );
 
-        timer.setOnFinished(event -> showMainMenu());
+        timer.setOnFinished(
+                event -> showMainMenu()
+        );
+
         timer.play();
     }
 
     private void showMainMenu() {
-        Label title = new Label("TETRIS");
-        title.setFont(Font.font(42));
 
-        Button playButton = createMenuButton("Play");
+        stopActiveGame();
+
+        Label title =
+                new Label("TETRIS");
+
+        title.setFont(
+                Font.font(42)
+        );
+
+        Button playButton =
+                createMenuButton("Play");
+
         Button configurationButton =
-                createMenuButton("Configuration");
+                createMenuButton(
+                        "Configuration"
+                );
+
         Button highScoresButton =
-                createMenuButton("High Scores");
-        Button exitButton = createMenuButton("Exit");
+                createMenuButton(
+                        "High Scores"
+                );
+
+        Button exitButton =
+                createMenuButton("Exit");
+
+        playButton.setOnAction(
+                event -> showGameScreen()
+        );
 
         configurationButton.setOnAction(
-                event -> showConfigurationScreen()
+                event ->
+                        showConfigurationScreen()
         );
 
         highScoresButton.setOnAction(
-                event -> showHighScoresScreen()
+                event ->
+                        showHighScoresScreen()
         );
 
         exitButton.setOnAction(
-                event -> showExitConfirmation()
+                event ->
+                        showExitConfirmation()
         );
 
-        VBox root = new VBox(
-                20,
-                title,
-                playButton,
-                configurationButton,
-                highScoresButton,
-                exitButton
-        );
+        VBox root =
+                new VBox(
+                        20,
+                        title,
+                        playButton,
+                        configurationButton,
+                        highScoresButton,
+                        exitButton
+                );
 
         root.setAlignment(Pos.CENTER);
-        root.setPadding(new Insets(40));
-        root.setStyle("-fx-background-color: #e8f4ff;");
 
-        stage.setScene(new Scene(root, 600, 700));
+        root.setPadding(
+                new Insets(40)
+        );
+
+        root.setStyle(
+                "-fx-background-color: #e8f4ff;"
+        );
+
+        stage.setScene(
+                new Scene(
+                        root,
+                        600,
+                        700
+                )
+        );
+
+        stage.setWidth(600);
+        stage.setHeight(700);
+
         stage.centerOnScreen();
     }
 
+    private void showGameScreen() {
+
+        stopActiveGame();
+
+        activeGamePane =
+                new GamePane(
+                        settings,
+                        this::showMainMenu
+                );
+
+        /*
+         * Keep the game window at a fixed size.
+         *
+         * GamePane handles board scaling, so a
+         * 40-row board will not make the entire
+         * application window extremely tall.
+         */
+        Scene scene =
+                new Scene(
+                        activeGamePane,
+                        700,
+                        760
+                );
+
+        stage.setScene(scene);
+
+        stage.setWidth(700);
+        stage.setHeight(760);
+
+        stage.centerOnScreen();
+
+        Platform.runLater(
+                activeGamePane::requestFocus
+        );
+    }
+
     private void showConfigurationScreen() {
-        Label title = new Label("CONFIGURATION");
-        title.setFont(Font.font(32));
+
+        stopActiveGame();
+
+        Label title =
+                new Label(
+                        "CONFIGURATION"
+                );
+
+        title.setFont(
+                Font.font(32)
+        );
 
         VBox widthControl =
-                createSliderControl("Field Width", 10, 20, 10);
+                createSliderControl(
+                        "Field Width",
+                        10,
+                        20,
+                        settings.getFieldWidth(),
+                        value ->
+                                settings.setFieldWidth(
+                                        value
+                                )
+                );
 
         VBox heightControl =
-                createSliderControl("Field Height", 20, 40, 20);
+                createSliderControl(
+                        "Field Height",
+                        20,
+                        40,
+                        settings.getFieldHeight(),
+                        value ->
+                                settings.setFieldHeight(
+                                        value
+                                )
+                );
 
         VBox levelControl =
-                createSliderControl("Game Level", 1, 10, 1);
+                createSliderControl(
+                        "Game Level",
+                        1,
+                        10,
+                        settings.getLevel(),
+                        value ->
+                                settings.setLevel(
+                                        value
+                                )
+                );
 
-        CheckBox musicCheckBox = new CheckBox("Music");
+        CheckBox musicCheckBox =
+                new CheckBox("Music");
+
         CheckBox soundEffectsCheckBox =
-                new CheckBox("Sound Effects");
-        CheckBox aiPlayCheckBox = new CheckBox("AI Play");
+                new CheckBox(
+                        "Sound Effects"
+                );
+
+        CheckBox aiPlayCheckBox =
+                new CheckBox(
+                        "AI Play"
+                );
+
         CheckBox extendedModeCheckBox =
-                new CheckBox("Extended Mode");
+                new CheckBox(
+                        "Extended Mode"
+                );
 
-        musicCheckBox.setSelected(true);
-        soundEffectsCheckBox.setSelected(true);
-
-        VBox checkBoxGroup = new VBox(
-                12,
-                musicCheckBox,
-                soundEffectsCheckBox,
-                aiPlayCheckBox,
-                extendedModeCheckBox
+        musicCheckBox.setSelected(
+                settings.isMusic()
         );
 
-        checkBoxGroup.setAlignment(Pos.CENTER_LEFT);
-        checkBoxGroup.setMaxWidth(300);
-
-        Button backButton = createMenuButton("Back");
-        backButton.setOnAction(event -> showMainMenu());
-
-        VBox root = new VBox(
-                20,
-                title,
-                widthControl,
-                heightControl,
-                levelControl,
-                checkBoxGroup,
-                backButton
+        soundEffectsCheckBox.setSelected(
+                settings.isSoundEffects()
         );
 
-        root.setAlignment(Pos.CENTER);
-        root.setPadding(new Insets(35));
-        root.setStyle("-fx-background-color: #e8f4ff;");
+        aiPlayCheckBox.setSelected(
+                settings.isAiPlay()
+        );
 
-        stage.setScene(new Scene(root, 600, 700));
+        extendedModeCheckBox.setSelected(
+                settings.isExtendedMode()
+        );
+
+        musicCheckBox
+                .selectedProperty()
+                .addListener(
+                        (
+                                observable,
+                                oldValue,
+                                newValue
+                        ) ->
+                                settings.setMusic(
+                                        newValue
+                                )
+                );
+
+        soundEffectsCheckBox
+                .selectedProperty()
+                .addListener(
+                        (
+                                observable,
+                                oldValue,
+                                newValue
+                        ) ->
+                                settings.setSoundEffects(
+                                        newValue
+                                )
+                );
+
+        aiPlayCheckBox
+                .selectedProperty()
+                .addListener(
+                        (
+                                observable,
+                                oldValue,
+                                newValue
+                        ) ->
+                                settings.setAiPlay(
+                                        newValue
+                                )
+                );
+
+        extendedModeCheckBox
+                .selectedProperty()
+                .addListener(
+                        (
+                                observable,
+                                oldValue,
+                                newValue
+                        ) ->
+                                settings.setExtendedMode(
+                                        newValue
+                                )
+                );
+
+        VBox checkBoxGroup =
+                new VBox(
+                        12,
+                        musicCheckBox,
+                        soundEffectsCheckBox,
+                        aiPlayCheckBox,
+                        extendedModeCheckBox
+                );
+
+        checkBoxGroup.setAlignment(
+                Pos.CENTER_LEFT
+        );
+
+        checkBoxGroup.setMaxWidth(
+                300
+        );
+
+        Button backButton =
+                createMenuButton(
+                        "Back"
+                );
+
+        backButton.setOnAction(
+                event -> showMainMenu()
+        );
+
+        VBox root =
+                new VBox(
+                        20,
+                        title,
+                        widthControl,
+                        heightControl,
+                        levelControl,
+                        checkBoxGroup,
+                        backButton
+                );
+
+        root.setAlignment(
+                Pos.CENTER
+        );
+
+        root.setPadding(
+                new Insets(35)
+        );
+
+        root.setStyle(
+                "-fx-background-color: #e8f4ff;"
+        );
+
+        stage.setScene(
+                new Scene(
+                        root,
+                        600,
+                        700
+                )
+        );
+
+        stage.setWidth(600);
+        stage.setHeight(700);
+
+        stage.centerOnScreen();
     }
 
     private VBox createSliderControl(
             String settingName,
             int minimum,
             int maximum,
-            int startingValue
+            int startingValue,
+            IntValueConsumer consumer
     ) {
+
         Label valueLabel =
-                new Label(settingName + ": " + startingValue);
+                new Label(
+                        settingName
+                                + ": "
+                                + startingValue
+                );
 
         Slider slider =
-                new Slider(minimum, maximum, startingValue);
+                new Slider(
+                        minimum,
+                        maximum,
+                        startingValue
+                );
 
         slider.setShowTickLabels(true);
         slider.setShowTickMarks(true);
         slider.setSnapToTicks(true);
-        slider.setMajorTickUnit(
-                settingName.equals("Game Level") ? 1 : 5
-        );
+
+        if (
+                settingName.equals(
+                        "Game Level"
+                )
+        ) {
+
+            slider.setMajorTickUnit(1);
+            slider.setMinorTickCount(0);
+
+        } else {
+
+            slider.setMajorTickUnit(5);
+            slider.setMinorTickCount(4);
+        }
+
         slider.setBlockIncrement(1);
-        slider.setMaxWidth(300);
 
-        slider.valueProperty().addListener(
-                (observable, oldValue, newValue) ->
-                        valueLabel.setText(
-                                settingName + ": " +
-                                        newValue.intValue()
-                        )
+        slider.setMaxWidth(
+                300
         );
 
-        VBox control = new VBox(8, valueLabel, slider);
-        control.setAlignment(Pos.CENTER);
+        slider
+                .valueProperty()
+                .addListener(
+                        (
+                                observable,
+                                oldValue,
+                                newValue
+                        ) -> {
+
+                            int value =
+                                    newValue.intValue();
+
+                            valueLabel.setText(
+                                    settingName
+                                            + ": "
+                                            + value
+                            );
+
+                            consumer.accept(
+                                    value
+                            );
+                        }
+                );
+
+        VBox control =
+                new VBox(
+                        8,
+                        valueLabel,
+                        slider
+                );
+
+        control.setAlignment(
+                Pos.CENTER
+        );
 
         return control;
     }
 
     private void showHighScoresScreen() {
-        Label title = new Label("HIGH SCORES");
-        title.setFont(Font.font(32));
 
-        List<HighScore> highScores = List.of(
-                new HighScore("AAA", 10000),
-                new HighScore("BBB", 9000),
-                new HighScore("CCC", 8000),
-                new HighScore("DDD", 7000),
-                new HighScore("EEE", 6000),
-                new HighScore("FFF", 5000),
-                new HighScore("GGG", 4000),
-                new HighScore("HHH", 3000),
-                new HighScore("III", 2000),
-                new HighScore("JJJ", 1000)
+        stopActiveGame();
+
+        Label title =
+                new Label(
+                        "HIGH SCORES"
+                );
+
+        title.setFont(
+                Font.font(32)
         );
 
-        VBox scoreList = new VBox(8);
-        scoreList.setAlignment(Pos.CENTER);
+        List<HighScore> highScores =
+                List.of(
+                        new HighScore(
+                                "AAA",
+                                10000
+                        ),
+
+                        new HighScore(
+                                "BBB",
+                                9000
+                        ),
+
+                        new HighScore(
+                                "CCC",
+                                8000
+                        ),
+
+                        new HighScore(
+                                "DDD",
+                                7000
+                        ),
+
+                        new HighScore(
+                                "EEE",
+                                6000
+                        ),
+
+                        new HighScore(
+                                "FFF",
+                                5000
+                        ),
+
+                        new HighScore(
+                                "GGG",
+                                4000
+                        ),
+
+                        new HighScore(
+                                "HHH",
+                                3000
+                        ),
+
+                        new HighScore(
+                                "III",
+                                2000
+                        ),
+
+                        new HighScore(
+                                "JJJ",
+                                1000
+                        )
+                );
+
+        VBox scoreList =
+                new VBox(8);
+
+        scoreList.setAlignment(
+                Pos.CENTER
+        );
 
         int position = 1;
 
-        for (HighScore highScore : highScores) {
-            Label scoreLabel = new Label(
-                    String.format(
-                            "%2d.  %-5s  %05d",
-                            position,
-                            highScore.playerName(),
-                            highScore.score()
+        for (
+                HighScore highScore :
+                highScores
+        ) {
+
+            Label scoreLabel =
+                    new Label(
+                            String.format(
+                                    "%2d.  %-5s  %05d",
+                                    position,
+                                    highScore.playerName(),
+                                    highScore.score()
+                            )
+                    );
+
+            scoreLabel.setFont(
+                    Font.font(
+                            "Monospaced",
+                            18
                     )
             );
 
-            scoreLabel.setFont(Font.font("Monospaced", 18));
-            scoreList.getChildren().add(scoreLabel);
+            scoreList
+                    .getChildren()
+                    .add(
+                            scoreLabel
+                    );
+
             position++;
         }
 
-        Button backButton = createMenuButton("Back");
-        backButton.setOnAction(event -> showMainMenu());
+        Button backButton =
+                createMenuButton(
+                        "Back"
+                );
 
-        VBox root = new VBox(
-                20,
-                title,
-                scoreList,
-                backButton
+        backButton.setOnAction(
+                event ->
+                        showMainMenu()
         );
 
-        root.setAlignment(Pos.CENTER);
-        root.setPadding(new Insets(35));
-        root.setStyle("-fx-background-color: #e8f4ff;");
+        VBox root =
+                new VBox(
+                        20,
+                        title,
+                        scoreList,
+                        backButton
+                );
 
-        stage.setScene(new Scene(root, 600, 700));
+        root.setAlignment(
+                Pos.CENTER
+        );
+
+        root.setPadding(
+                new Insets(35)
+        );
+
+        root.setStyle(
+                "-fx-background-color: #e8f4ff;"
+        );
+
+        stage.setScene(
+                new Scene(
+                        root,
+                        600,
+                        700
+                )
+        );
+
+        stage.setWidth(600);
+        stage.setHeight(700);
+
+        stage.centerOnScreen();
     }
 
-    private Button createMenuButton(String text) {
-        Button button = new Button(text);
-        button.setPrefSize(220, 50);
-        button.setFont(Font.font(18));
+    private Button createMenuButton(
+            String text
+    ) {
+
+        Button button =
+                new Button(text);
+
+        button.setPrefSize(
+                220,
+                50
+        );
+
+        button.setFont(
+                Font.font(18)
+        );
+
         return button;
     }
 
     private void showExitConfirmation() {
+
         ButtonType yesButton =
-                new ButtonType("Yes", ButtonBar.ButtonData.YES);
+                new ButtonType(
+                        "Yes",
+                        ButtonBar.ButtonData.YES
+                );
 
         ButtonType noButton =
-                new ButtonType("No", ButtonBar.ButtonData.NO);
+                new ButtonType(
+                        "No",
+                        ButtonBar.ButtonData.NO
+                );
 
-        Alert alert = new Alert(
-                Alert.AlertType.CONFIRMATION,
-                "Are you sure you want to exit?",
-                yesButton,
-                noButton
+        Alert alert =
+                new Alert(
+                        Alert.AlertType.CONFIRMATION,
+                        "Are you sure you want to exit?",
+                        yesButton,
+                        noButton
+                );
+
+        alert.setTitle(
+                "Exit Confirmation"
         );
 
-        alert.setTitle("Exit Confirmation");
-        alert.setHeaderText("Exit Tetris?");
+        alert.setHeaderText(
+                "Exit Tetris?"
+        );
 
         ButtonType result =
-                alert.showAndWait().orElse(noButton);
+                alert
+                        .showAndWait()
+                        .orElse(
+                                noButton
+                        );
 
-        if (result == yesButton) {
+        if (
+                result == yesButton
+        ) {
+
             Platform.exit();
         }
     }
 
-    public static void main(String[] args) {
+    private void stopActiveGame() {
+
+        if (
+                activeGamePane != null
+        ) {
+
+            activeGamePane.stop();
+
+            activeGamePane = null;
+        }
+    }
+
+    @Override
+    public void stop() {
+
+        stopActiveGame();
+    }
+
+    @FunctionalInterface
+    private interface IntValueConsumer {
+
+        void accept(
+                int value
+        );
+    }
+
+    public static void main(
+            String[] args
+    ) {
+
         launch(args);
     }
 }
