@@ -1,0 +1,13 @@
+2006ICT Tetris - Final v9
+
+This is the post-server-test version.
+
+It includes:
+- supplied TetrisServer.jar JSON protocol compatibility
+- bounded External-player movement (no UI freeze)
+- cropped server shape matrices with padded-coordinate correction
+- paced External movement with normal game gravity and no hard-drop bonus
+- S reserved for sound and C used for Player 2 soft drop
+- visible AI movement
+- Human controls disabled for AI and External players
+- expanded movement, rotation, drop, lock, line, pause and game-over effects

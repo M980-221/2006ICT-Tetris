@@ -15,6 +15,17 @@ public final class GameBoard {
     public int getColumns() { return columns; }
     public TetrominoType getCell(int row, int column) { return cells[row][column]; }
 
+    public void setCell(int row, int column, TetrominoType type) {
+        if (row < 0 || row >= rows || column < 0 || column >= columns) throw new IndexOutOfBoundsException();
+        cells[row][column] = type;
+    }
+
+    public GameBoard copy() {
+        GameBoard copy = new GameBoard(columns, rows);
+        for (int row = 0; row < rows; row++) System.arraycopy(cells[row], 0, copy.cells[row], 0, columns);
+        return copy;
+    }
+
     public boolean canPlace(Tetromino piece, int row, int column, int rotation) {
         for (int[] cell : piece.getType().cells(rotation)) {
             int boardColumn = column + cell[0];

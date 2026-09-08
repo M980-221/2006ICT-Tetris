@@ -1,12 +1,12 @@
 package com.pg2.tetris;
 
-import java.util.Random;
-
 public final class GameController {
     private final GameBoard board;
-    private final Random random = new Random();
     private final GameEventListener listener;
     private final int startingLevel;
+    private final PieceSequence sequence;
+    private final TetrominoFactory factory;
+    private int pieceIndex;
 
     private Tetromino currentPiece;
     private int score;
@@ -16,16 +16,24 @@ public final class GameController {
     private double fallProgress;
 
     public GameController(GameSettings settings, GameEventListener listener) {
+        this(settings, listener, new PieceSequence(), new TetrominoFactory());
+    }
+
+    public GameController(GameSettings settings, GameEventListener listener, PieceSequence sequence, TetrominoFactory factory) {
         this.board = new GameBoard(settings.getFieldWidth(), settings.getFieldHeight());
         this.startingLevel = settings.getLevel();
         this.listener = listener;
+        this.sequence = sequence;
+        this.factory = factory;
         spawnPiece();
     }
 
     public GameBoard getBoard() { return board; }
     public Tetromino getCurrentPiece() { return currentPiece; }
+    public TetrominoType getNextPieceType() { return sequence.at(pieceIndex); }
     public int getScore() { return score; }
     public int getLines() { return lines; }
+    public int getLevel() { return Math.min(10, startingLevel + lines / 10); }
     public boolean isGameOver() { return gameOver; }
     public boolean isPaused() { return paused; }
     public double getFallProgress() {
@@ -47,7 +55,7 @@ public final class GameController {
     }
 
     public double getDropIntervalSeconds() {
-        int effectiveLevel = Math.min(10, startingLevel + lines / 10);
+        int effectiveLevel = getLevel();
         return Math.max(0.12, 0.75 - (effectiveLevel - 1) * 0.06);
     }
 
@@ -67,11 +75,26 @@ public final class GameController {
     }
 
     public void moveLeft() {
-        tryMove(0, -1);
+        if (tryMove(0, -1)) AudioManager.getInstance().move();
     }
 
     public void moveRight() {
-        tryMove(0, 1);
+        if (tryMove(0, 1)) AudioManager.getInstance().move();
+    }
+
+    /**
+     * Moves toward a server-selected column without ever blocking the UI.
+     * Returns false when a wall or occupied cell prevents reaching the target.
+     */
+    public boolean moveToColumn(int requestedColumn) {
+        if (paused || gameOver || currentPiece == null) return false;
+        int target = Math.max(-2, Math.min(board.getColumns() - 1, requestedColumn));
+        int remainingAttempts = board.getColumns() + 4;
+        while (currentPiece.getColumn() != target && remainingAttempts-- > 0) {
+            int direction = Integer.compare(target, currentPiece.getColumn());
+            if (!tryMove(0, direction)) return false;
+        }
+        return currentPiece.getColumn() == target;
     }
 
     public boolean moveDown() {
@@ -84,6 +107,7 @@ public final class GameController {
     public void softDrop() {
         if (moveDown()) {
             score += 1;
+            AudioManager.getInstance().move();
             notifyScore();
         }
         fallProgress = 0;
@@ -96,6 +120,7 @@ public final class GameController {
             distance++;
         }
         score += distance * 2;
+        AudioManager.getInstance().hardDrop();
         lockCurrentPiece();
         fallProgress = 0;
         notifyScore();
@@ -111,6 +136,7 @@ public final class GameController {
             if (board.canPlace(currentPiece, currentPiece.getRow(), currentPiece.getColumn() + offset, nextRotation)) {
                 currentPiece.setColumn(currentPiece.getColumn() + offset);
                 currentPiece.setRotation(nextRotation);
+                AudioManager.getInstance().rotate();
                 return;
             }
         }
@@ -119,6 +145,7 @@ public final class GameController {
     public void togglePause() {
         if (!gameOver) {
             paused = !paused;
+            AudioManager.getInstance().pause();
         }
     }
 
@@ -137,28 +164,25 @@ public final class GameController {
 
     private void lockCurrentPiece() {
         board.lock(currentPiece);
+        AudioManager.getInstance().lock();
         int cleared = board.clearFullRows();
         if (cleared > 0) {
             lines += cleared;
-            score += switch (cleared) {
-                case 1 -> 100;
-                case 2 -> 300;
-                case 3 -> 500;
-                default -> 800;
-            } * Math.max(1, startingLevel);
+            score += ScoreRules.lineClearScore(cleared);
+            AudioManager.getInstance().lineClear();
             notifyScore();
         }
         spawnPiece();
     }
 
     private void spawnPiece() {
-        TetrominoType[] types = TetrominoType.values();
-        TetrominoType type = types[random.nextInt(types.length)];
-        currentPiece = new StandardTetromino(type, -1, Math.max(0, board.getColumns() / 2 - 2));
+        TetrominoType type = sequence.at(pieceIndex++);
+        currentPiece = factory.create(type, board.getColumns());
         fallProgress = 0;
 
         if (!board.canPlace(currentPiece, currentPiece.getRow(), currentPiece.getColumn(), 0)) {
             gameOver = true;
+            AudioManager.getInstance().gameOver();
             if (listener != null) listener.onGameOver(score);
         }
     }
